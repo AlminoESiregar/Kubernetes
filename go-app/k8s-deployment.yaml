@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: go-app
-        image: yourdockerhubusername/go-app:latest
+        image: almino72/go-app:latest
         ports:
         - containerPort: 8080
 ---
