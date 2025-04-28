@@ -1,0 +1,63 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKERHUB_CREDENTIALS = 'dockerhub'   // Jenkins Credentials ID for DockerHub
+        GITHUB_CREDENTIALS = 'github'         // Jenkins Credentials ID for GitHub
+        K8S_CREDENTIALS = 'kubernetes'                // Jenkins Credentials ID for Kubeconfig
+        DOCKERHUB_USERNAME = 'almino72'      // Your DockerHub username
+    }
+
+    stages {
+        stage('Checkout Code from GitHub') {
+            steps {
+                git credentialsId: "${GITHUB_CREDENTIALS}", branch: 'main', url: 'https://github.com/AlminoESiregar/Kubernetes.git'
+            }
+        }
+
+        stage('Build Docker Images') {
+            parallel {
+                stage('Build Go App Image') {
+                    steps {
+                        dir('go-app') {
+                            sh 'docker build -t $DOCKERHUB_USERNAME/go-app:latest .'
+                        }
+                    }
+                }
+                stage('Build Node.js App Image') {
+                    steps {
+                        dir('node-app') {
+                            sh 'docker build -t $DOCKERHUB_USERNAME/node-app:latest .'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Push Docker Images to DockerHub') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: "${DOCKERHUB_CREDENTIALS}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh '''
+                    echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                    docker push $DOCKERHUB_USERNAME/go-app:latest
+                    docker push $DOCKERHUB_USERNAME/node-app:latest
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy to Kubernetes') {
+            steps {
+                withCredentials([file(credentialsId: "${K8S_CREDENTIALS}", variable: 'KUBECONFIG')]) {
+                    script {
+                        dir('go-app') {
+                            sh 'kubectl apply -f k8s-deployment.yaml --kubeconfig=$KUBECONFIG'
+                        }
+                        dir('node-app') {
+                            sh 'kubectl apply -f k8s-deployment.yaml --kubeconfig=$KUBECONFIG'
+                        }
+                    }
+                }
+            }
+        }
+    }
