@@ -5,8 +5,7 @@ WORKDIR /app
 
 # Copy go mod files first (good practice for caching)
 COPY go.mod ./
-COPY go.sum ./
-RUN go mod download
+RUN go mod tidy
 
 # Now copy all the source code
 COPY . .
